@@ -1,4 +1,4 @@
-name: Build TVBox APK
+name: Build TVBox APK - Single Debug Variant (arm64 generic normal debug)
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -19,39 +19,35 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Grant execute permission for gradlew
+      - name: Make gradlew executable
         run: chmod +x gradlew
 
-      - name: Clean project
+      - name: Clean previous builds
         run: ./gradlew clean
 
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug --stacktrace --info
+      # 只构建 debug 版：arm64 + generic + normal + debug
+      - name: Assemble single debug variant
+        run: ./gradlew assembleArm64GenericNormalDebug --stacktrace --info --build-cache --parallel
 
-      - name: Build Release Unsigned APK
-        run: ./gradlew assembleRelease --stacktrace --info --build-cache --parallel
-
-      # 列出所有生成的 APK 路径（debug 用，方便看日志）
-      - name: List all generated APKs
+      # 打印所有生成的 APK 文件路径（用于确认位置）
+      - name: Print all generated APK locations
         if: always()
         run: |
-          echo "Listing APKs:"
-          find app/build/outputs/apk -name "*.apk" || true
-          ls -laR app/build/outputs/apk || true
+          echo "======================================"
+          echo "寻找所有 .apk 文件（完整路径）："
+          find app/build/outputs -type f -name "*.apk" 2>/dev/null || echo "未找到任何 .apk 文件"
+          echo ""
+          echo "======================================"
+          echo "outputs/apk 目录结构："
+          ls -laR app/build/outputs/apk 2>/dev/null || echo "目录不存在或为空"
+          echo "======================================"
 
-      # 上传所有找到的 APK（递归通配）
-      - name: Upload All Debug APKs
+      # 使用递归查找上传 debug APK（最稳妥，不会因为目录结构变化而失败）
+      - name: Upload debug APK (recursive search)
         uses: actions/upload-artifact@v4
         with:
-          name: tvbox-debug-apks
-          path: app/build/outputs/apk/**/*.apk   # ** 递归所有子目录
-          retention-days: 7
+          name: TVBox-debug-arm64-generic-normal
+          path: app/build/outputs/**/*.apk
           if-no-files-found: warn
-
-      - name: Upload All Release APKs
-        uses: actions/upload-artifact@v4
-        with:
-          name: tvbox-release-apks
-          path: app/build/outputs/apk/**/*.apk
           retention-days: 7
-          if-no-files-found: warn
+          compression-level: 6
